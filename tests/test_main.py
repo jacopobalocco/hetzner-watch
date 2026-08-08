@@ -6,7 +6,7 @@ import hetzner_watch.__main__ as main_module
 from hetzner_watch.__main__ import decide, load_config, should_save
 from hetzner_watch.compare import Candidate, Delta
 from hetzner_watch.hetzner import Baseline, Offer, Specs, parse_baselines
-from hetzner_watch.report import CLOSE_COMMENT_TEXT, ISSUE_TITLE
+from hetzner_watch.report import BASELINE_LOCATION_EMPTY_TEXT, CLOSE_COMMENT_TEXT, ISSUE_TITLE
 from hetzner_watch.snapshot import Changes, build_snapshot, diff, load, save
 
 SPECS = Specs(2, 2.0, 40, "shared", "x86")
@@ -104,6 +104,22 @@ def test_should_save_is_false_without_changes_and_a_previous_snapshot():
     assert should_save(previous, NO_CHANGES) is False
 
 
+def test_should_save_is_true_for_a_spec_only_change():
+    # Finding 1: the pre-fix gate (previous is None or new/price_changed/gone)
+    # never saw a spec-only change, so a stale record would persist forever.
+    previous = build_snapshot(BASELINE, [CANDIDATE], "2026-08-06T07:00:00Z")
+    changes = Changes(new=(), price_changed=(), gone=(), spec_changed=("CAX21@fsn1",))
+    assert should_save(previous, changes) is True
+
+
+def test_should_save_is_true_for_a_baseline_only_change():
+    # Same absorbing-state risk as above, but for a resized baseline with an
+    # unchanged candidate set.
+    previous = build_snapshot(BASELINE, [CANDIDATE], "2026-08-06T07:00:00Z")
+    changes = Changes(new=(), price_changed=(), gone=(), baseline_changed=True)
+    assert should_save(previous, changes) is True
+
+
 def test_no_changes_leaves_the_committed_snapshot_file_byte_identical(tmp_path):
     path = tmp_path / "snapshot.json"
     previous = build_snapshot(BASELINE, [CANDIDATE], "2026-08-06T07:00:00Z")
@@ -146,7 +162,9 @@ def test_changes_do_update_the_committed_snapshot_file(tmp_path):
 # and hetzner_watch.__main__.Issues.
 
 
-def server_type(id_, name, location, price, memory=2, traffic_bytes=20 * 1024**4):
+def server_type(
+    id_, name, location, price, memory=2, traffic_bytes=20 * 1024**4, available=True
+):
     return {
         "id": id_,
         "name": name,
@@ -164,7 +182,7 @@ def server_type(id_, name, location, price, memory=2, traffic_bytes=20 * 1024**4
         ],
         # available lives here, not in the datacenters payload (Finding 1 /
         # docs/api-findings.md #6): parse_offers reads locations[].available.
-        "locations": [{"name": location, "available": True, "deprecation": None}],
+        "locations": [{"name": location, "available": available, "deprecation": None}],
     }
 
 
@@ -309,9 +327,14 @@ def test_warns_on_stdout_when_more_than_one_server_is_found(monkeypatch, tmp_pat
     main_module.main()
 
     out = capsys.readouterr().out
-    assert "2 server" in out
-    assert "srv-a" in out
-    assert "srv-b" in out
+    # Finding 5: "srv-a" in out / "srv-b" in out both hold no matter which of
+    # the two is reported as chosen, since {names} always lists both. Pin the
+    # full rendered message instead, so the chosen slot is checked at its own
+    # position rather than as a substring that exists twice either way.
+    expected = main_module.MULTIPLE_SERVERS_WARNING.format(
+        count=2, names="srv-a, srv-b", chosen="srv-a"
+    )
+    assert expected in out
 
 
 def test_does_not_warn_when_exactly_one_server_is_found(monkeypatch, tmp_path, capsys):
@@ -452,3 +475,56 @@ def test_main_does_nothing_on_the_issues_client_when_nothing_changed(monkeypatch
     main_module.main()
 
     assert issue_calls == []
+
+
+def test_main_reports_zero_availability_at_the_baseline_location_in_the_posted_body(
+    monkeypatch, tmp_path
+):
+    # Finding 2: baseline_location_available is computed in main() and threaded
+    # through decide() into render_body() two hops away from this assertion.
+    # Hardcoding True at either hop would silently drop the note from the
+    # real issue body, so this must be checked end to end, not at render_body
+    # directly (already covered in test_report.py).
+    set_env(monkeypatch, tmp_path, "tok-a")
+    # CPX12 (the baseline's own type) and CAX21 both read unavailable in
+    # fsn1; CAX21 stays a real candidate via a second, available offer in
+    # nbg1, so the run still produces a non-empty table alongside the note.
+    cpx12_unavailable = server_type(1, "CPX12", "fsn1", 5.0, memory=2, available=False)
+    cax21_two_locations = {
+        "id": 2,
+        "name": "CAX21",
+        "cores": 2,
+        "memory": 8,
+        "disk": 40,
+        "cpu_type": "shared",
+        "architecture": "x86",
+        "prices": [
+            {
+                "location": "fsn1",
+                "price_monthly": {"net": "7.00"},
+                "included_traffic": 20 * 1024**4,
+            },
+            {
+                "location": "nbg1",
+                "price_monthly": {"net": "6.50"},
+                "included_traffic": 20 * 1024**4,
+            },
+        ],
+        "locations": [
+            {"name": "fsn1", "available": False, "deprecation": None},
+            {"name": "nbg1", "available": True, "deprecation": None},
+        ],
+    }
+    server_types_json = {"server_types": [cpx12_unavailable, cax21_two_locations]}
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, server_types_json, DATACENTERS_JSON)})
+    monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
+    issues_cls, issue_calls = fake_issues(open_issue=None)
+    monkeypatch.setattr(main_module, "Issues", issues_cls)
+
+    main_module.main()
+
+    assert len(issue_calls) == 1
+    kind, title, body, label = issue_calls[0]
+    assert kind == "create"
+    assert "CAX21" in body
+    assert BASELINE_LOCATION_EMPTY_TEXT.format(location="fsn1") in body

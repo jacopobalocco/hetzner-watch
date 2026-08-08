@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from hetzner_watch.compare import Candidate, Delta
 from hetzner_watch.hetzner import Baseline, Offer, Specs
 from hetzner_watch.snapshot import Snapshot, build_snapshot, diff, has_changes, load, save
@@ -8,9 +10,21 @@ SPECS = Specs(2, 2.0, 40, "shared", "x86")
 BASELINE = Baseline("srv", "CPX12", "fsn1", SPECS, 5.0, 20.0)
 
 
-def candidate(name="CAX21", location="fsn1", price=7.0, disk_gb=40):
-    specs = Specs(2, 2.0, disk_gb, "shared", "x86")
-    offer = Offer(name, location, specs, price, 20.0, deprecated=False, available=True)
+def candidate(
+    name="CAX21",
+    location="fsn1",
+    price=7.0,
+    cores=2,
+    memory_gb=2.0,
+    disk_gb=40,
+    cpu_type="shared",
+    architecture="x86",
+    included_traffic_tib=20.0,
+):
+    specs = Specs(cores, memory_gb, disk_gb, cpu_type, architecture)
+    offer = Offer(
+        name, location, specs, price, included_traffic_tib, deprecated=False, available=True
+    )
     return Candidate(offer, (Delta("memory_gb", 2.0, 8.0, True),), needs_multiarch=False)
 
 
@@ -103,6 +117,27 @@ def test_unchanged_candidates_report_no_spec_change():
     assert diff(before, after).spec_changed == ()
 
 
+@pytest.mark.parametrize(
+    "field, before_value, after_value",
+    [
+        ("cores", 2, 4),
+        ("memory_gb", 2.0, 4.0),
+        ("cpu_type", "shared", "dedicated"),
+        ("architecture", "x86", "arm"),
+        ("included_traffic_tib", 20.0, 21.0),
+    ],
+)
+def test_diff_detects_spec_changes_on_every_non_price_field(field, before_value, after_value):
+    # Finding 3: the existing spec-change tests above only ever vary disk_gb,
+    # so a _non_price narrowed to {"disk_gb": ...} would still pass all of
+    # them. Cover the remaining five fields individually.
+    before = snapshot(candidate(**{field: before_value}))
+    after = snapshot(candidate(**{field: after_value}))
+    changes = diff(before, after)
+    assert changes.spec_changed == ("CAX21@fsn1",)
+    assert changes.price_changed == ()
+
+
 def test_diff_detects_baseline_changes():
     # Finding 4: Snapshot.baseline is recorded but never compared - resizing
     # cpx12 -> cx33 with an unchanged candidate set must still be a change,
@@ -110,6 +145,16 @@ def test_diff_detects_baseline_changes():
     before = snapshot(candidate())
     resized = Baseline("srv", "CX33", "fsn1", SPECS, 8.49, 20.0)
     after = build_snapshot(resized, [candidate()], "2026-08-07T07:00:00Z")
+    assert diff(before, after).baseline_changed is True
+
+
+def test_diff_detects_a_baseline_change_on_a_field_other_than_type_name():
+    # Finding 4: the test above changes type_name and price together, so a
+    # baseline_changed narrowed to comparing only type_name would still pass
+    # it. Change price alone, with type_name held fixed, to pin that down.
+    before = snapshot(candidate())
+    repriced = Baseline("srv", "CPX12", "fsn1", SPECS, 5.49, 20.0)
+    after = build_snapshot(repriced, [candidate()], "2026-08-07T07:00:00Z")
     assert diff(before, after).baseline_changed is True
 
 
