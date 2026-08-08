@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Un job giornaliero su GitHub Actions che confronta il server Hetzner Cloud in uso contro il catalogo EU e apre/aggiorna una issue con le alternative sotto i 20 € netti.
+**Goal:** Un job giornaliero su GitHub Actions che confronta il server Hetzner Cloud in uso contro il catalogo EU e apre/aggiorna una issue con le alternative fino a 20 € netti.
 
 **Architecture:** Pipeline in quattro stadi — fetch (`hetzner.py`) → confronto (`compare.py`) → diff di stato (`snapshot.py`) → report e issue (`report.py`, `github.py`), messi insieme da `__main__.py`. Tutta la logica non banale vive in funzioni pure che prendono strutture dati e restituiscono strutture dati; la rete sta solo nei due moduli di I/O. Lo stato è un `snapshot.json` committato dal job.
 
@@ -1547,7 +1547,7 @@ Create `README.md`:
 # hetzner-watch
 
 Job giornaliero che confronta il server Hetzner Cloud in uso contro il catalogo EU
-e apre una issue quando esiste un'alternativa migliore sotto i 20 € netti/mese.
+e apre una issue quando esiste un'alternativa migliore fino a 20 € netti/mese.
 
 ## Come funziona
 
