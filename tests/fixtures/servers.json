@@ -1,0 +1,195 @@
+{
+  "meta": {
+    "pagination": {
+      "last_page": 1,
+      "next_page": null,
+      "page": 1,
+      "per_page": 50,
+      "previous_page": null,
+      "total_entries": 1
+    }
+  },
+  "servers": [
+    {
+      "backup_window": null,
+      "created": "2026-07-17T13:07:13Z",
+      "id": 10000001,
+      "image": {
+        "architecture": "x86",
+        "bound_to": null,
+        "created": "2026-05-18T11:00:39Z",
+        "created_from": null,
+        "deleted": null,
+        "deprecated": null,
+        "description": "Ubuntu 26.04",
+        "disk_size": 5,
+        "id": 10000002,
+        "image_size": null,
+        "labels": {},
+        "name": "ubuntu-26.04",
+        "os_flavor": "ubuntu",
+        "os_version": "26.04",
+        "protection": {
+          "delete": false
+        },
+        "rapid_deploy": true,
+        "status": "available",
+        "type": "system"
+      },
+      "included_traffic": 21990232555520,
+      "ingoing_traffic": 698440000,
+      "iso": null,
+      "labels": {},
+      "load_balancers": [],
+      "location": {
+        "city": "Falkenstein",
+        "country": "DE",
+        "description": "Falkenstein DC Park 1",
+        "id": 1,
+        "latitude": 50.47612,
+        "longitude": 12.370071,
+        "name": "fsn1",
+        "network_zone": "eu-central"
+      },
+      "locked": false,
+      "name": "example-server-1",
+      "outgoing_traffic": 229510000,
+      "placement_group": null,
+      "primary_disk_size": 40,
+      "private_net": [],
+      "protection": {
+        "delete": false,
+        "rebuild": false
+      },
+      "public_net": {
+        "firewalls": [],
+        "floating_ips": [],
+        "ipv4": {
+          "blocked": false,
+          "dns_ptr": "static.203.0.113.1.clients.your-server.de",
+          "id": 10000003,
+          "ip": "203.0.113.1"
+        },
+        "ipv6": {
+          "blocked": false,
+          "dns_ptr": [],
+          "id": 10000004,
+          "ip": "2001:db8::1"
+        }
+      },
+      "rescue_enabled": false,
+      "server_type": {
+        "architecture": "x86",
+        "category": "regular_purpose",
+        "cores": 1,
+        "cpu_type": "shared",
+        "deprecated": false,
+        "deprecation": null,
+        "description": "CPX 12",
+        "disk": 40,
+        "id": 108,
+        "locations": [
+          {
+            "available": true,
+            "deprecation": null,
+            "id": 1,
+            "name": "fsn1",
+            "recommended": false
+          },
+          {
+            "available": true,
+            "deprecation": null,
+            "id": 2,
+            "name": "nbg1",
+            "recommended": false
+          },
+          {
+            "available": true,
+            "deprecation": null,
+            "id": 3,
+            "name": "hel1",
+            "recommended": true
+          },
+          {
+            "available": true,
+            "deprecation": null,
+            "id": 6,
+            "name": "sin",
+            "recommended": false
+          }
+        ],
+        "memory": 2,
+        "name": "cpx12",
+        "prices": [
+          {
+            "included_traffic": 21990232555520,
+            "location": "fsn1",
+            "price_hourly": {
+              "gross": "0.0224480000000000",
+              "net": "0.0184000000"
+            },
+            "price_monthly": {
+              "gross": "14.0178000000000000",
+              "net": "11.4900000000"
+            },
+            "price_per_tb_traffic": {
+              "gross": "1.2200000000000000",
+              "net": "1.0000000000"
+            }
+          },
+          {
+            "included_traffic": 21990232555520,
+            "location": "hel1",
+            "price_hourly": {
+              "gross": "0.0224480000000000",
+              "net": "0.0184000000"
+            },
+            "price_monthly": {
+              "gross": "14.0178000000000000",
+              "net": "11.4900000000"
+            },
+            "price_per_tb_traffic": {
+              "gross": "1.2200000000000000",
+              "net": "1.0000000000"
+            }
+          },
+          {
+            "included_traffic": 21990232555520,
+            "location": "nbg1",
+            "price_hourly": {
+              "gross": "0.0224480000000000",
+              "net": "0.0184000000"
+            },
+            "price_monthly": {
+              "gross": "14.0178000000000000",
+              "net": "11.4900000000"
+            },
+            "price_per_tb_traffic": {
+              "gross": "1.2200000000000000",
+              "net": "1.0000000000"
+            }
+          },
+          {
+            "included_traffic": 549755813888,
+            "location": "sin",
+            "price_hourly": {
+              "gross": "0.0302560000000000",
+              "net": "0.0248000000"
+            },
+            "price_monthly": {
+              "gross": "18.8978000000000000",
+              "net": "15.4900000000"
+            },
+            "price_per_tb_traffic": {
+              "gross": "9.0280000000000000",
+              "net": "7.4000000000"
+            }
+          }
+        ],
+        "storage_type": "local"
+      },
+      "status": "running",
+      "volumes": []
+    }
+  ]
+}

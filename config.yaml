@@ -1,0 +1,3 @@
+max_price_eur_net: 20.0
+locations: [fsn1, nbg1, hel1]
+include_arm: true
