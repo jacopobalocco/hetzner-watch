@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 import pathlib
 
@@ -5,12 +6,10 @@ import pytest
 
 import hetzner_watch.availability as availability_module
 from hetzner_watch.availability import (
-    CLOSE,
-    NOOP,
-    OPEN,
-    decide,
-    label,
+    load_state,
     location_availability,
+    newly_available,
+    save_state,
 )
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
@@ -55,82 +54,81 @@ def test_the_real_fixture_reads_cx43_available_in_fsn1():
 
 
 @pytest.mark.parametrize(
-    ("available", "open_issue", "expected"),
+    ("previous", "current", "expected"),
     [
-        (True, None, OPEN),  # sold out -> available: the one alert
-        (True, 7, NOOP),  # still available: no repeat
-        (False, 7, CLOSE),  # available -> sold out: re-arm
-        (False, None, NOOP),  # still sold out
+        ({"fsn1": False}, {"fsn1": True}, ["fsn1"]),  # sold out -> available: the alert
+        ({"fsn1": True}, {"fsn1": True}, []),  # still available: no repeat
+        ({"fsn1": True}, {"fsn1": False}, []),  # sold out again: silent, re-armed
+        ({"fsn1": False}, {"fsn1": False}, []),
+        ({}, {"fsn1": True}, ["fsn1"]),  # first run, already available
+        ({"fsn1": True}, {"fsn1": True, "nbg1": True}, ["nbg1"]),
     ],
 )
-def test_decide_alerts_only_on_the_transition_to_available(available, open_issue, expected):
-    assert decide(available, open_issue) == expected
+def test_only_a_turn_to_available_is_news(previous, current, expected):
+    assert newly_available(previous, current) == expected
 
 
-def test_each_location_has_its_own_label():
-    assert label("cx43", "fsn1") != label("cx43", "nbg1")
+def test_state_round_trips_and_starts_empty(tmp_path):
+    path = tmp_path / "state.json"
+    assert load_state(path) == {}
+    save_state(path, {"fsn1": True, "nbg1": False})
+    assert load_state(path) == {"fsn1": True, "nbg1": False}
 
 
-def fake_issues(open_by_label):
-    calls = []
-
-    class FakeIssues:
-        def __init__(self, repo, token, transport=None):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc_info):
-            return False
-
-        def find_open(self, issue_label):
-            return open_by_label.get(issue_label)
-
-        def create(self, title, body, issue_label, assignees=None):
-            calls.append(("create", issue_label, assignees))
-            return 99
-
-        def close(self, number, comment):
-            calls.append(("close", number))
-
-    return FakeIssues, calls
-
-
-def test_main_opens_closes_and_leaves_alone_per_location(monkeypatch, tmp_path):
+def run_main(monkeypatch, tmp_path, catalog, sent, fail_send=False):
     config = tmp_path / "config.yaml"
-    config.write_text("locations: [fsn1, nbg1, hel1]\nwatch_type: cx43\n")
+    config.write_text("locations: [fsn1, nbg1]\nwatch_type: cx43\nvm_location: fsn1\n")
     monkeypatch.setattr(availability_module, "CONFIG_PATH", config)
+    monkeypatch.setattr(availability_module, "STATE_PATH", tmp_path / "state.json")
     monkeypatch.setenv("HCLOUD_TOKEN", "tok-a,tok-b")
-    monkeypatch.setenv("GITHUB_TOKEN", "gh-tok")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "me/infra-fleet")
-    monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "me")
-    tokens = []
-
-    def fetch_server_types(token, transport=None):
-        tokens.append(token)
-        return cx43(fsn1=True, nbg1=False, hel1=True)
-
-    monkeypatch.setattr(availability_module.hetzner, "fetch_server_types", fetch_server_types)
-    issues_cls, calls = fake_issues(
-        {label("cx43", "nbg1"): 4, label("cx43", "hel1"): 5}
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "app-pw")
+    monkeypatch.setattr(
+        availability_module.hetzner, "fetch_server_types", lambda token: catalog
     )
-    monkeypatch.setattr(availability_module, "Issues", issues_cls)
+    monkeypatch.setattr(availability_module, "render_mail", lambda *a: ("s", "t", "h"))
 
+    def send_mail(subject, text, html, app_password):
+        if fail_send:
+            raise OSError("smtp down")
+        sent.append(app_password)
+
+    monkeypatch.setattr(availability_module, "send_mail", send_mail)
     availability_module.main()
 
-    assert tokens == ["tok-a"]
-    assert calls == [
-        ("create", label("cx43", "fsn1"), ["me"]),
-        ("close", 4),
-    ]
+
+def test_main_mails_once_across_hours_and_again_after_a_sell_out(monkeypatch, tmp_path):
+    sent = []
+    run_main(monkeypatch, tmp_path, cx43(fsn1=False, nbg1=False), sent)
+    run_main(monkeypatch, tmp_path, cx43(fsn1=True, nbg1=False), sent)
+    run_main(monkeypatch, tmp_path, cx43(fsn1=True, nbg1=False), sent)
+    assert len(sent) == 1
+    run_main(monkeypatch, tmp_path, cx43(fsn1=False, nbg1=False), sent)
+    run_main(monkeypatch, tmp_path, cx43(fsn1=True, nbg1=False), sent)
+    assert len(sent) == 2
 
 
-def test_main_refuses_an_empty_token(monkeypatch, tmp_path):
-    # The 2026-08/10 failures: the secret was never set, the env var is "".
-    config = tmp_path / "config.yaml"
-    config.write_text("locations: [fsn1]\nwatch_type: cx43\n")
-    monkeypatch.setattr(availability_module, "CONFIG_PATH", config)
+def test_a_failed_mail_leaves_the_state_so_the_next_run_retries(monkeypatch, tmp_path):
+    sent = []
+    with pytest.raises(OSError):
+        run_main(monkeypatch, tmp_path, cx43(fsn1=True, nbg1=False), sent, fail_send=True)
+    run_main(monkeypatch, tmp_path, cx43(fsn1=True, nbg1=False), sent)
+    assert len(sent) == 1
+
+
+def test_main_refuses_missing_secrets(monkeypatch, tmp_path):
+    # The GitHub job's failures of 2026-08/10: a token that was never set.
     monkeypatch.setenv("HCLOUD_TOKEN", "")
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "x")
     with pytest.raises(SystemExit, match="HCLOUD_TOKEN"):
         availability_module.main()
+
+
+def test_the_mail_says_whether_the_vms_location_is_among_them():
+    pytest.importorskip("mailstile")
+    when = dt.datetime(2026, 10, 14, 17, 17, tzinfo=dt.UTC)
+    subject, text, html = availability_module.render_mail("cx43", ["fsn1"], "fsn1", when)
+    assert "cx43" in subject and "fsn1" in subject
+    assert "dove sta la VM: il ridimensionamento è possibile" in text
+    _, text, _ = availability_module.render_mail("cx43", ["nbg1"], "fsn1", when)
+    assert "Non in fsn1" in text
+    assert "<style" not in html
