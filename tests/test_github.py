@@ -91,6 +91,18 @@ def test_create_posts_title_body_and_label():
     }
 
 
+def test_create_sends_assignees_when_given():
+    handler, calls = recorder([httpx.Response(201, json={"id": 555000111, "number": 8})])
+    with issues(handler) as api:
+        api.create("Titolo", "Corpo", LABEL, assignees=["owner-login"])
+    assert calls[0][3] == {
+        "title": "Titolo",
+        "body": "Corpo",
+        "labels": [LABEL],
+        "assignees": ["owner-login"],
+    }
+
+
 def test_update_patches_only_the_body():
     handler, calls = recorder([httpx.Response(200, json={"number": 7, "state": "open"})])
     with issues(handler) as api:

@@ -8,7 +8,7 @@ import re
 from hetzner_watch.hetzner import fetch
 
 FIXTURES = pathlib.Path(__file__).parent.parent / "tests" / "fixtures"
-ENDPOINTS = ["servers", "server_types", "datacenters"]
+ENDPOINTS = ["servers", "server_types"]
 
 IPV4 = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 IPV6 = re.compile(r"\b(?:[0-9a-f]{1,4}:){2,}[0-9a-f:/]+\b", re.IGNORECASE)

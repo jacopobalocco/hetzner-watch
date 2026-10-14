@@ -200,7 +200,22 @@ def test_fetch_follows_pagination():
         key = request.url.path.rsplit("/", 1)[-1]
         return httpx.Response(200, json={key: [], **empty})
 
-    servers, server_types, datacenters = fetch(
+    servers, server_types = fetch(
         "tok", transport=httpx.MockTransport(handler)
     )
     assert [t["id"] for t in server_types["server_types"]] == [1, 2]
+
+
+def test_fetch_never_calls_the_retired_datacenters_endpoint():
+    # /v1/datacenters answers 410 Gone (observed 2026-10-14); a fetch that still
+    # walks it fails the whole run before any availability is read.
+    empty = {"meta": {"pagination": {"next_page": None}}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        key = request.url.path.rsplit("/", 1)[-1]
+        if key == "datacenters":
+            return httpx.Response(410, json={"error": {"code": "gone"}})
+        return httpx.Response(200, json={key: [], **empty})
+
+    servers, server_types = fetch("tok", transport=httpx.MockTransport(handler))
+    assert servers["servers"] == [] and server_types["server_types"] == []

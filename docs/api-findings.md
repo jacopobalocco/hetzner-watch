@@ -84,6 +84,12 @@ tramite `scripts/capture_fixtures.py` (progetto Hetzner dell'account, token Read
    Il payload `datacenters` resta catturato dallo script di fixture per eventuale
    diagnostica futura, ma non alimenta più il parsing.
 
+7. **`GET /v1/datacenters` risponde `410 Gone`** (osservato il 2026-10-14 con un token
+   valido). `fetch()` non lo chiama più e `tests/fixtures/datacenters.json` è stato
+   rimosso: finché lo chiamava, ogni run falliva prima di leggere la disponibilità,
+   anche con il token giusto. `/v1/servers` e `/v1/server_types` rispondono come
+   prima.
+
 ## Nota collaterale (script di ispezione del brief)
 
 Il comando di ispezione nel brief assume `servers[].datacenter.name` e

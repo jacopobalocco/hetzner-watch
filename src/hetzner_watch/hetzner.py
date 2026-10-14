@@ -155,17 +155,29 @@ def _get_all_pages(client: httpx.Client, endpoint: str) -> dict:
         page = next_page
 
 
-def fetch(
-    token: str, transport: httpx.BaseTransport | None = None
-) -> tuple[dict, dict, dict]:
-    with httpx.Client(
+def _client(token: str, transport: httpx.BaseTransport | None) -> httpx.Client:
+    return httpx.Client(
         base_url=BASE_URL,
         headers={"Authorization": f"Bearer {token}"},
         timeout=30,
         transport=transport,
-    ) as client:
+    )
+
+
+# /datacenters is not fetched: it answers 410 Gone (observed 2026-10-14), and its
+# availability lists were stale anyway (docs/api-findings.md #6, #7).
+def fetch(
+    token: str, transport: httpx.BaseTransport | None = None
+) -> tuple[dict, dict]:
+    with _client(token, transport) as client:
         return (
             _get_all_pages(client, "servers"),
             _get_all_pages(client, "server_types"),
-            _get_all_pages(client, "datacenters"),
         )
+
+
+def fetch_server_types(
+    token: str, transport: httpx.BaseTransport | None = None
+) -> dict:
+    with _client(token, transport) as client:
+        return _get_all_pages(client, "server_types")

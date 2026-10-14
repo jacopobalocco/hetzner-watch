@@ -1,6 +1,6 @@
 # AGENTS.md
 
-hetzner-watch è un job giornaliero (GitHub Actions) che confronta un server Hetzner
+hetzner-watch è un job orario (GitHub Actions) che confronta un server Hetzner
 Cloud con il catalogo Hetzner e segnala alternative migliori o più economiche
 aprendo/aggiornando/chiudendo una issue GitHub. **Vincolo rigido, non negoziabile:**
 il job legge soltanto (token Hetzner con permesso Read) e non deve mai acquisire
@@ -29,6 +29,7 @@ esplicitamente.
 | `src/hetzner_watch/snapshot.py` | Stato (`Snapshot`), diff rispetto al run precedente | `build_snapshot`/`diff`/`has_changes` sono pure; `load`/`save` sono IO su file |
 | `src/hetzner_watch/report.py` | Rendering markdown della issue | Puro: stringhe in, stringa fuori |
 | `src/hetzner_watch/github.py` | Client Issues (find/create/update/close) | IO (httpx, `transport` iniettabile nei test) |
+| `src/hetzner_watch/availability.py` | Avviso di ritorno in disponibilità di `watch_type`, una issue per location | Entry point a sé (`python -m hetzner_watch.availability`), passo separato del workflow; lo stato è la issue aperta, nessun file |
 | `src/hetzner_watch/__main__.py` | Wiring: legge env/config, chiama gli altri moduli, decide l'azione | L'unico punto dove IO e logica pura si incontrano |
 | `scripts/capture_fixtures.py` | Cattura le fixture da un account Hetzner reale, redige gli IP | IO, va eseguito a mano, mai nei test |
 

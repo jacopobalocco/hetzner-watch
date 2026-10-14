@@ -2,14 +2,16 @@ name: hetzner-watch
 
 on:
   schedule:
-    - cron: "0 7 * * *"
+    # Hourly, off the top of the hour: GitHub delays and drops schedules most
+    # at :00.
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
   issues: write
 
-# A manual workflow_dispatch overlapping the 07:00 cron would race on
+# A manual workflow_dispatch overlapping the hourly cron would race on
 # snapshot.json and the git push (Finding 9); serialize instead of cancelling
 # a run that may already be mid-way through an Issues API mutation.
 concurrency:
@@ -30,6 +32,14 @@ jobs:
       - run: uv sync
 
       - run: uv run pytest -q
+
+      - name: Avvisa se il tipo osservato torna disponibile
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: uv run python -m hetzner_watch.availability
 
       - name: Confronta il catalogo
         env:
@@ -61,4 +71,22 @@ jobs:
               fi
               sleep $((attempt * 5))
             done
+          fi
+
+      # A public repository's schedule is disabled after 60 days without
+      # activity, and a run is not activity: it happened on 2026-10-07. A
+      # commit is; the API's "enable" is not documented to reset the clock.
+      # Snapshot commits are rare, so push an empty one only when main has
+      # been quiet for 50 days.
+      - name: Keepalive
+        if: always()
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          last=$(git log -1 --format=%ct "origin/$GITHUB_REF_NAME")
+          if (( $(date +%s) - last > 50 * 86400 )); then
+            git config user.name "hetzner-watch"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive"
+            git push origin "HEAD:$GITHUB_REF_NAME"
           fi

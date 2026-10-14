@@ -79,10 +79,7 @@ def main() -> None:
     baselines: list[Baseline] = []
     offers: list[hetzner.Offer] = []
     for token in tokens:
-        # datacenters payload is fetched but no longer parsed: its
-        # available/supported lists are stale (docs/api-findings.md #6).
-        # Kept for future diagnostics, dropped from parse_offers.
-        servers_json, server_types_json, _datacenters_json = hetzner.fetch(token)
+        servers_json, server_types_json = hetzner.fetch(token)
         baselines += hetzner.parse_baselines(servers_json, server_types_json)
         if not offers:
             offers = hetzner.parse_offers(server_types_json)

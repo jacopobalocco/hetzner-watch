@@ -180,8 +180,7 @@ def server_type(
                 "included_traffic": traffic_bytes,
             }
         ],
-        # available lives here, not in the datacenters payload (Finding 1 /
-        # docs/api-findings.md #6): parse_offers reads locations[].available.
+        # parse_offers reads availability here (docs/api-findings.md #6).
         "locations": [{"name": location, "available": available, "deprecation": None}],
     }
 
@@ -201,13 +200,6 @@ def server(name, type_name, location="fsn1"):
     }
 
 
-def datacenter(location, available_ids):
-    # Content is inert since Finding 1 (hetzner.fetch still returns a
-    # 3-tuple, so fake_fetch's stand-ins must match its shape, but
-    # parse_offers no longer reads this payload for availability).
-    return {"location": {"name": location}, "server_types": {"available": available_ids}}
-
-
 # CPX12 (id 1) is the baseline's own type: find_candidates excludes it as its
 # own baseline, so its presence in the catalog is inert except as bait for a
 # broken exclusion. CAX21 (id 2) is a genuine candidate (more memory, under
@@ -217,7 +209,6 @@ CAX21_TYPE = server_type(2, "CAX21", "fsn1", 7.0, memory=8)
 CCX13_TYPE = server_type(3, "CCX13", "fsn1", 6.0, memory=8)
 
 SERVER_TYPES_JSON = {"server_types": [CPX12_TYPE, CAX21_TYPE]}
-DATACENTERS_JSON = {"datacenters": [datacenter("fsn1", [1, 2])]}
 SERVERS_JSON = {"servers": [server("srv-a", "CPX12", "fsn1")]}
 EMPTY_SERVERS_JSON = {"servers": []}
 
@@ -225,12 +216,10 @@ EMPTY_SERVERS_JSON = {"servers": []}
 # but offers CCX13 instead of CAX21. Used to prove the "if not offers" guard
 # keeps the first token's catalog rather than the last one's.
 SERVER_TYPES_JSON_B = {"server_types": [CPX12_TYPE, CCX13_TYPE]}
-DATACENTERS_JSON_B = {"datacenters": [datacenter("fsn1", [1, 3])]}
 
 # A catalog with no viable alternative at all (only the baseline's own
 # type), for the close-the-issue scenario.
 SERVER_TYPES_JSON_NO_CANDIDATES = {"server_types": [CPX12_TYPE]}
-DATACENTERS_JSON_NO_CANDIDATES = {"datacenters": [datacenter("fsn1", [1])]}
 
 
 def fake_fetch(by_token):
@@ -287,8 +276,8 @@ def test_multiple_comma_separated_tokens_are_all_used_and_baselines_accumulate(
     set_env(monkeypatch, tmp_path, " tok-a , tok-b ")
     fetch, fetch_calls = fake_fetch(
         {
-            "tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON),
-            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON),
+            "tok-a": (SERVERS_JSON, SERVER_TYPES_JSON),
+            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON),
         }
     )
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
@@ -319,7 +308,7 @@ def test_warns_on_stdout_when_more_than_one_server_is_found(monkeypatch, tmp_pat
     set_env(monkeypatch, tmp_path, "tok-a")
     second_server = server("srv-b", "CPX12", "fsn1")
     servers_with_two = {"servers": [*SERVERS_JSON["servers"], second_server]}
-    fetch, _ = fake_fetch({"tok-a": (servers_with_two, SERVER_TYPES_JSON, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (servers_with_two, SERVER_TYPES_JSON)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, _ = fake_issues(open_issue=None)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
@@ -339,7 +328,7 @@ def test_warns_on_stdout_when_more_than_one_server_is_found(monkeypatch, tmp_pat
 
 def test_does_not_warn_when_exactly_one_server_is_found(monkeypatch, tmp_path, capsys):
     set_env(monkeypatch, tmp_path, "tok-a")
-    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, _ = fake_issues(open_issue=None)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
@@ -353,8 +342,8 @@ def test_catalog_is_fetched_from_the_first_token_only(monkeypatch, tmp_path):
     set_env(monkeypatch, tmp_path, "tok-a,tok-b")
     fetch, fetch_calls = fake_fetch(
         {
-            "tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON),
-            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON_B, DATACENTERS_JSON_B),
+            "tok-a": (SERVERS_JSON, SERVER_TYPES_JSON),
+            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON_B),
         }
     )
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
@@ -376,8 +365,8 @@ def test_no_servers_across_any_token_exits_with_a_clear_error(monkeypatch, tmp_p
     set_env(monkeypatch, tmp_path, "tok-a,tok-b")
     fetch, _ = fake_fetch(
         {
-            "tok-a": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON),
-            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON),
+            "tok-a": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON),
+            "tok-b": (EMPTY_SERVERS_JSON, SERVER_TYPES_JSON),
         }
     )
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
@@ -394,7 +383,7 @@ def test_no_servers_across_any_token_exits_with_a_clear_error(monkeypatch, tmp_p
 
 def test_main_creates_the_issue_when_none_is_open(monkeypatch, tmp_path):
     set_env(monkeypatch, tmp_path, "tok-a")
-    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, issue_calls = fake_issues(open_issue=None)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
@@ -409,7 +398,7 @@ def test_main_creates_the_issue_when_none_is_open(monkeypatch, tmp_path):
 
 def test_main_updates_the_issue_when_the_candidate_set_changed(monkeypatch, tmp_path):
     set_env(monkeypatch, tmp_path, "tok-a")
-    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, issue_calls = fake_issues(open_issue=7)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
@@ -431,8 +420,7 @@ def test_main_closes_the_issue_when_no_candidates_remain(monkeypatch, tmp_path):
         {
             "tok-a": (
                 SERVERS_JSON,
-                SERVER_TYPES_JSON_NO_CANDIDATES,
-                DATACENTERS_JSON_NO_CANDIDATES,
+                SERVER_TYPES_JSON_NO_CANDIDATES
             )
         }
     )
@@ -450,7 +438,7 @@ def test_main_closes_the_issue_when_no_candidates_remain(monkeypatch, tmp_path):
 
 def test_main_does_nothing_on_the_issues_client_when_nothing_changed(monkeypatch, tmp_path):
     set_env(monkeypatch, tmp_path, "tok-a")
-    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, SERVER_TYPES_JSON)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, issue_calls = fake_issues(open_issue=7)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
@@ -516,7 +504,7 @@ def test_main_reports_zero_availability_at_the_baseline_location_in_the_posted_b
         ],
     }
     server_types_json = {"server_types": [cpx12_unavailable, cax21_two_locations]}
-    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, server_types_json, DATACENTERS_JSON)})
+    fetch, _ = fake_fetch({"tok-a": (SERVERS_JSON, server_types_json)})
     monkeypatch.setattr(main_module.hetzner, "fetch", fetch)
     issues_cls, issue_calls = fake_issues(open_issue=None)
     monkeypatch.setattr(main_module, "Issues", issues_cls)
