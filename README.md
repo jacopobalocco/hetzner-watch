@@ -1,6 +1,6 @@
 # hetzner-watch
 
-Job orario che confronta un server Hetzner Cloud in uso contro il catalogo
+Job giornaliero che confronta un server Hetzner Cloud in uso contro il catalogo
 Hetzner e segnala, aprendo/aggiornando/chiudendo una issue GitHub, le alternative
 che costano meno o rendono di più entro una soglia di spesa configurabile.
 
@@ -12,13 +12,14 @@ che costano meno o rendono di più entro una soglia di spesa configurabile.
 3. Segnala i tipi sotto soglia che migliorano almeno una metrica rispetto al tuo
    server, mostrando anche le eventuali regressioni con il segno.
 4. Apre, aggiorna o chiude una issue con label `hetzner-watch`.
-5. Avvisa quando il tipo `watch_type` torna ordinabile in una delle `locations`:
-   apre una issue nuova per quella location (label `disponibile:<tipo>@<location>`),
-   assegnata al proprietario del repo, e la chiude quando il tipo torna esaurito.
-   Una issue aperta vale "ancora disponibile", quindi nessun avviso ripetuto;
-   un ritorno dopo l'esaurimento apre una issue nuova. L'assegnazione serve
-   perché una issue nuova notifica solo chi osserva il repo, e modificare il
-   corpo di una issue non notifica nessuno.
+5. **In locale, non su GitHub:** un LaunchAgent sul Mac
+   (`launchd/com.hetzner-watch.availability.plist`, installato dalla sync dei
+   dotfiles) legge ogni ora al minuto 17 la disponibilità di `watch_type` nelle
+   `locations` e manda una mail quando passa da esaurito a disponibile. Lo
+   stato è `availability-state.json` (fuori da git): nessuna mail ripetuta
+   finché resta disponibile, una nuova se si esaurisce e torna. Token e app
+   password di Gmail stanno in `.env`, rigenerato dal vault da `secrets-sync`
+   (nota `env: hetzner-watch/.env`). Log in `/tmp/hetzner-watch-availability.{log,err}`.
 
 Oggi il job monitora **solo il primo server trovato** tra tutti quelli restituiti
 dai token configurati, anche se questi coprono più progetti o più server: gli
@@ -48,8 +49,8 @@ segnalazione, la procedura manuale è documentata in
 2. **Salvalo come secret del repository GitHub**: *Settings* → *Secrets and
    variables* → *Actions* → *New repository secret*, nome `HCLOUD_TOKEN`. Per
    più progetti, metti tutti i token nello stesso secret separati da virgola.
-3. **Il workflow** (`.github/workflows/daily.yml`) gira ogni ora al minuto
-   17 (cron; GitHub può ritardarlo o saltarne qualcuno), più `workflow_dispatch` per lanciarlo a mano da *Actions →
+3. **Il workflow** (`.github/workflows/daily.yml`) gira ogni giorno alle 07:00
+   UTC (cron), più `workflow_dispatch` per lanciarlo a mano da *Actions →
    hetzner-watch → Run workflow*. Ad ogni run: installa le dipendenze, esegue i
    test, confronta il catalogo, apre/aggiorna/chiude la issue e — se l'insieme
    dei candidati è cambiato — committa `snapshot.json` sul branch. Per questo
@@ -94,7 +95,8 @@ uv run python scripts/capture_fixtures.py
 | `max_price_eur_net` | Tetto di spesa in € **netti**/mese (IVA esclusa) |
 | `locations` | Location Hetzner ammesse nel confronto |
 | `include_arm` | Se includere i tipi ARM (CAX), marcati `multi-arch` |
-| `watch_type` | Tipo di cui avvisare il ritorno in disponibilità, nelle `locations` |
+| `watch_type` | Tipo di cui il watcher locale avvisa il ritorno in disponibilità, nelle `locations` |
+| `vm_location` | Sede della VM: la mail dice se il tipo è tornato proprio lì |
 
 Due cose che potresti osservare in output e che non sono un bug:
 

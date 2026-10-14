@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hetzner-watch.availability</string>
+
+    <!-- .env is rebuilt from the vault by secrets-sync (dotfiles/secrets/manifest.toml);
+         the code reads only its environment, so the shell loads the file. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>set -a; . ./.env; set +a; exec .venv/bin/python -m hetzner_watch.availability</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jacopobalocco/code_repos/hetzner-watch</string>
+
+    <!-- Every hour at :17. A run missed while the Mac sleeps happens on waking. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Minute</key>
+        <integer>17</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/hetzner-watch-availability.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/hetzner-watch-availability.err</string>
+
+    <!-- Each run stands alone: a failed one is retried by the next hour's. -->
+    <key>KeepAlive</key>
+    <false/>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

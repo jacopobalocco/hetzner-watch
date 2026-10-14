@@ -40,13 +40,10 @@ class Issues:
         found = response.json()
         return int(found[0]["number"]) if found else None
 
-    def create(
-        self, title: str, body: str, label: str, assignees: list[str] | None = None
-    ) -> int:
-        payload: dict = {"title": title, "body": body, "labels": [label]}
-        if assignees:
-            payload["assignees"] = assignees
-        response = self._request("POST", "/issues", json=payload)
+    def create(self, title: str, body: str, label: str) -> int:
+        response = self._request(
+            "POST", "/issues", json={"title": title, "body": body, "labels": [label]}
+        )
         return int(response.json()["number"])
 
     def update(self, number: int, body: str) -> None:
