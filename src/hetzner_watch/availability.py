@@ -1,6 +1,6 @@
 """Mail the owner once when a watched server type turns orderable again.
 
-Runs hourly on the owner's Mac from a LaunchAgent
+Runs every minute on the owner's Mac mini 2 (run_on_host) from a LaunchAgent
 (launchd/com.hetzner-watch.availability.plist), not from GitHub Actions: a
 public repository's schedule is switched off after 60 days without commits,
 and main's protection refuses the bot's commits, so the job could not keep
@@ -76,7 +76,7 @@ def render_mail(
             "stessa sede, quindi per ora non cambia niente."
         )
     footer = (
-        "Il job non ridimensiona nulla: la procedura è in docs/runbook-rescale.md. "
+        "Se è la sede della VM, acquire.py lo compra e ridimensiona la VM nella stessa esecuzione. "
         f"Letto da GET /v1/server_types il {st.data_it(seen_at)} alle "
         f"{seen_at:%H:%M}. Un nuovo avviso arriva solo se il tipo si esaurisce e torna."
     )
@@ -96,6 +96,14 @@ def render_mail(
     return subject, text, html
 
 
+def on_this_host(raw: dict) -> bool:
+    # scutil, not socket.gethostname(): DHCP renames the latter (mini 2 reads "192.168.1.115").
+    import subprocess
+
+    name = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True).stdout.strip()
+    return name == raw["run_on_host"]
+
+
 def send_mail(subject: str, text: str, html: str, app_password: str) -> None:
     # Raises on failure: main() then leaves the state unsaved, so the next run
     # tries the same mail again instead of losing it.
@@ -112,6 +120,8 @@ def send_mail(subject: str, text: str, html: str, app_password: str) -> None:
 def main() -> None:
     seen_at = dt.datetime.now().astimezone()
     raw = yaml.safe_load(CONFIG_PATH.read_text())
+    if not on_this_host(raw):
+        return
     type_name = raw["watch_type"]
     vm_location = raw["vm_location"]
     locations = tuple(raw["locations"])

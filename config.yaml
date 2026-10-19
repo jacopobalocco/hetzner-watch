@@ -3,3 +3,11 @@ locations: [fsn1, nbg1, hel1]
 include_arm: true
 watch_type: cx43
 vm_location: fsn1
+# acquire.py (Read & Write token): the VM it resizes, and what it checks after.
+vm_server_id: 152020402
+health_url: https://miraneve.com/health
+disk_command: ssh -o ConnectTimeout=10 -o BatchMode=yes deploy@100.86.130.115 'df -h / | tail -1'
+# The one Mac that runs the availability mail and acquire.py. The dotfiles
+# manifest installs the LaunchAgent on every personal machine; two runners
+# could each buy a placeholder and shut the VM down at once.
+run_on_host: Mac-mini-di-Jacopo-2
