@@ -79,6 +79,7 @@ def run_main(monkeypatch, tmp_path, catalog, sent, fail_send=False):
     config = tmp_path / "config.yaml"
     config.write_text("locations: [fsn1, nbg1]\nwatch_type: cx43\nvm_location: fsn1\n")
     monkeypatch.setattr(availability_module, "CONFIG_PATH", config)
+    monkeypatch.setattr(availability_module, "on_this_host", lambda raw: True)
     monkeypatch.setattr(availability_module, "STATE_PATH", tmp_path / "state.json")
     monkeypatch.setenv("HCLOUD_TOKEN", "tok-a,tok-b")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "app-pw")
@@ -119,6 +120,7 @@ def test_main_refuses_missing_secrets(monkeypatch, tmp_path):
     # The GitHub job's failures of 2026-08/10: a token that was never set.
     monkeypatch.setenv("HCLOUD_TOKEN", "")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "x")
+    monkeypatch.setattr(availability_module, "on_this_host", lambda raw: True)
     with pytest.raises(SystemExit, match="HCLOUD_TOKEN"):
         availability_module.main()
 
@@ -132,3 +134,11 @@ def test_the_mail_says_whether_the_vms_location_is_among_them():
     _, text, _ = availability_module.render_mail("cx43", ["nbg1"], "fsn1", when)
     assert "Non in fsn1" in text
     assert "<style" not in html
+
+
+def test_another_host_neither_reads_nor_mails(monkeypatch, tmp_path):
+    config = tmp_path / "config.yaml"
+    config.write_text("watch_type: cx43\nvm_location: fsn1\nlocations: [fsn1]\nrun_on_host: Elsewhere\n")
+    monkeypatch.setattr(availability_module, "CONFIG_PATH", config)
+    monkeypatch.setattr(availability_module.hetzner, "fetch_server_types", lambda *a: pytest.fail("read on the wrong host"))
+    availability_module.main()

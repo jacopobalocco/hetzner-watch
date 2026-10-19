@@ -2,11 +2,19 @@
 
 hetzner-watch è un job giornaliero (GitHub Actions) che confronta un server Hetzner
 Cloud con il catalogo Hetzner e segnala alternative migliori o più economiche
-aprendo/aggiornando/chiudendo una issue GitHub. **Vincolo rigido, non negoziabile:**
-il job legge soltanto (token Hetzner con permesso Read) e non deve mai acquisire
-la capacità di modificare risorse Hetzner — non creare, ridimensionare o cancellare
-nulla, in nessun percorso di codice, per nessuna ragione. È decision support, punto:
-la issue segnala, un umano decide e agisce (vedi `docs/runbook-rescale.md`).
+aprendo/aggiornando/chiudendo una issue GitHub. **Il job giornaliero legge soltanto**
+(token Hetzner con permesso Read): segnala, un umano decide (`docs/runbook-rescale.md`).
+
+**Un'eccezione, una sola: `src/hetzner_watch/acquire.py`.** Decisione del proprietario,
+2026-10-19: ingrandire la VM viene prima di tutto, finestre dei job di produzione e
+buchi di dati compresi. Gira ogni minuto, solo sul Mac `run_on_host` di `config.yaml` (Mac mini 2), con un token Read & Write
+(`HCLOUD_RW_TOKEN` nel `.env`) e appena `watch_type` è ordinabile nel datacenter
+della VM compra un segnaposto, spegne la VM, fa lo snapshot e la ridimensiona
+(`upgrade_disk`, irreversibile). Può creare e cancellare **solo** il segnaposto
+(label `hetzner-watch=placeholder`, al massimo uno) e ridimensionare **solo**
+`vm_server_id`. Nessun altro modulo usa quel token; non estendere ciò che può fare
+senza una nuova decisione del proprietario. Dopo un errore scrive `acquire-halted`
+e non tocca più niente finché qualcuno non lo cancella.
 
 ## Build · test
 
