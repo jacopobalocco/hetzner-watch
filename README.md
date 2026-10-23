@@ -12,14 +12,12 @@ che costano meno o rendono di più entro una soglia di spesa configurabile.
 3. Segnala i tipi sotto soglia che migliorano almeno una metrica rispetto al tuo
    server, mostrando anche le eventuali regressioni con il segno.
 4. Apre, aggiorna o chiude una issue con label `hetzner-watch`.
-5. **In locale, non su GitHub:** un LaunchAgent sul Mac
-   (`launchd/com.hetzner-watch.availability.plist`, installato dalla sync dei
-   dotfiles) legge ogni ora al minuto 17 la disponibilità di `watch_type` nelle
-   `locations` e manda una mail quando passa da esaurito a disponibile. Lo
-   stato è `availability-state.json` (fuori da git): nessuna mail ripetuta
-   finché resta disponibile, una nuova se si esaurisce e torna. Token e app
-   password di Gmail stanno in `.env`, rigenerato dal vault da `secrets-sync`
-   (nota `env: hetzner-watch/.env`). Log in `/tmp/hetzner-watch-availability.{log,err}`.
+5. **Ritirato il 2026-10-23:** il watcher locale (`availability.py` + `acquire.py`,
+   lanciati da un LaunchAgent sul Mac) aspettava che `watch_type` tornasse
+   ordinabile nella sede della VM per ridimensionarla. La VM è cx43 dal
+   2026-10-20, quindi il LaunchAgent è stato scaricato e il suo plist rimosso.
+   Il codice resta; per riarmarlo serve un nuovo plist in `launchd/` e la riga
+   nel manifesto dei dotfiles.
 
 Oggi il job monitora **solo il primo server trovato** tra tutti quelli restituiti
 dai token configurati, anche se questi coprono più progetti o più server: gli

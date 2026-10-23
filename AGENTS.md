@@ -37,7 +37,7 @@ esplicitamente.
 | `src/hetzner_watch/snapshot.py` | Stato (`Snapshot`), diff rispetto al run precedente | `build_snapshot`/`diff`/`has_changes` sono pure; `load`/`save` sono IO su file |
 | `src/hetzner_watch/report.py` | Rendering markdown della issue | Puro: stringhe in, stringa fuori |
 | `src/hetzner_watch/github.py` | Client Issues (find/create/update/close) | IO (httpx, `transport` iniettabile nei test) |
-| `src/hetzner_watch/availability.py` | Watcher locale: mail quando `watch_type` torna disponibile | Gira sul Mac da `launchd/com.hetzner-watch.availability.plist`, non da GitHub Actions; stato in `availability-state.json`; `mailstile` è l'extra `mail`, importato solo lì |
+| `src/hetzner_watch/availability.py` | Watcher locale: mail quando `watch_type` torna disponibile | Ritirato il 2026-10-23 (VM già cx43): nessun LaunchAgent lo lancia più; stato in `availability-state.json`; `mailstile` è l'extra `mail`, importato solo lì |
 | `src/hetzner_watch/__main__.py` | Wiring: legge env/config, chiama gli altri moduli, decide l'azione | L'unico punto dove IO e logica pura si incontrano |
 | `scripts/capture_fixtures.py` | Cattura le fixture da un account Hetzner reale, redige gli IP | IO, va eseguito a mano, mai nei test |
 
